@@ -37,7 +37,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS characters (
             user_id INTEGER,
             slot INTEGER,
-            name TEXT DEFAULT 'Пустой слот',
+            name TEXT DEFAULT 'Имя не указано',
+            race TEXT DEFAULT 'Не указана',
+            fight_style TEXT DEFAULT 'Не указан',
             level INTEGER DEFAULT 0,
             прочность INTEGER DEFAULT 0,
             сила INTEGER DEFAULT 0,
@@ -55,6 +57,13 @@ def init_db():
         )
     """)
     conn.commit()
+    # Миграция: добавляем новые колонки, если база уже существовала без них
+    for col, default in [("race", "'Не указана'"), ("fight_style", "'Не указан'")]:
+        try:
+            c.execute(f"ALTER TABLE characters ADD COLUMN {col} TEXT DEFAULT {default}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # колонка уже существует
     conn.close()
 
 def get_char(user_id, slot):
@@ -120,7 +129,7 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
         return
 
     row = get_char(member.id, slot)
-    (_, _, name, level, prochnost, sila, skorost, reakciya,
+    (_, _, name, race, fight_style, level, prochnost, sila, skorost, reakciya,
      stoikost, regen, kontrol, energiya, traits, artifacts, achievements, image_url) = row
 
     embed = discord.Embed(title=f"📋 [Слот {slot}] {name}", color=discord.Color.blue())
@@ -128,6 +137,8 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
     if image_url:
         embed.set_image(url=image_url)
 
+    embed.add_field(name="🧬 Раса", value=race, inline=True)
+    embed.add_field(name="⚔️ Стиль боя", value=fight_style, inline=True)
     embed.add_field(name="🎖 Уровень авантюриста", value=str(level), inline=False)
     embed.add_field(
         name="📊 Статы",
@@ -275,6 +286,28 @@ async def set_name(ctx, member: discord.Member, slot: int, *, char_name: str):
         return
     set_field(member.id, slot, "name", char_name)
     await ctx.send(f"✅ Имя персонажа (слот {slot}) установлено: {char_name}")
+
+@bot.command(name="раса")
+async def set_race(ctx, member: discord.Member, slot: int, *, race_name: str):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    set_field(member.id, slot, "race", race_name)
+    await ctx.send(f"✅ Раса персонажа (слот {slot}) установлена: {race_name}")
+
+@bot.command(name="стиль_боя")
+async def set_fight_style(ctx, member: discord.Member, slot: int, *, style_name: str):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    set_field(member.id, slot, "fight_style", style_name)
+    await ctx.send(f"✅ Стиль боя персонажа (слот {slot}) установлен: {style_name}")
 
 @bot.command(name="фото")
 async def set_photo(ctx, member: discord.Member, slot: int):
