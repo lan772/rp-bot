@@ -29,6 +29,18 @@ STATS = {
     "энергия": "Мана/Энергия",
 }
 
+# Единицы измерения для точных значений (для красивого отображения)
+STAT_UNITS = {
+    "прочность": "кг (выдерживаемая нагрузка)",
+    "сила": "кг (сила удара/подъёма)",
+    "скорость": "км/ч",
+    "реакция": "мс",
+    "стойкость": "очков",
+    "регенерация": "% в пост",
+    "контроль_маны": "% эффективности",
+    "энергия": "%",
+}
+
 # ============ БАЗА ДАННЫХ ============
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -46,6 +58,7 @@ def init_db():
             age TEXT DEFAULT 'Не указан',
             info TEXT DEFAULT '—',
             organization TEXT DEFAULT 'Не указана',
+            builds TEXT DEFAULT '—',
             balance INTEGER DEFAULT 0,
             cleared_zones INTEGER DEFAULT 0,
             прочность INTEGER DEFAULT 0,
@@ -73,6 +86,7 @@ def init_db():
         ("age", "'Не указан'"),
         ("info", "'—'"),
         ("organization", "'Не указана'"),
+        ("builds", "'—'"),
     ]
     for col, default in new_columns:
         try:
@@ -93,7 +107,7 @@ def init_db():
 # SQLite хранит их в таблице (важно из-за ALTER TABLE при миграциях)
 COLUMN_ORDER = [
     "user_id", "slot", "name", "race", "fight_style", "level",
-    "height", "weight", "age", "info", "organization", "balance", "cleared_zones",
+    "height", "weight", "age", "info", "organization", "builds", "balance", "cleared_zones",
     "прочность", "сила", "скорость", "реакция", "стойкость", "регенерация",
     "контроль_маны", "энергия", "traits", "artifacts", "achievements", "image_url"
 ]
@@ -163,7 +177,7 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
 
     row = get_char(member.id, slot)
     (_, _, name, race, fight_style, level, height, weight, age, info_text,
-     organization, balance, cleared_zones,
+     organization, builds, balance, cleared_zones,
      prochnost, sila, skorost, reakciya,
      stoikost, regen, kontrol, energiya, traits, artifacts, achievements, image_url) = row
 
@@ -186,18 +200,19 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
     )
     embed.add_field(name="📖 Информация", value=info_text, inline=False)
     embed.add_field(name="🏛 Организация", value=organization, inline=True)
+    embed.add_field(name="🧩 Сборка", value=builds, inline=False)
     embed.add_field(name="💰 Баланс", value=f"{balance} монет", inline=True)
     embed.add_field(name="🗺 Зачищено Аномальных Зон", value=str(cleared_zones), inline=True)
     embed.add_field(
         name="📊 Статы",
         value=(
-            f"Прочность: {prochnost}\n"
-            f"Сила: {sila}\n"
-            f"Скорость: {skorost}\n"
-            f"Реакция: {reakciya}\n"
-            f"Стойкость: {stoikost}\n"
-            f"Регенерация: {regen}\n"
-            f"Контроль маны: {kontrol}\n"
+            f"Прочность: {prochnost} кг\n"
+            f"Сила: {sila} кг\n"
+            f"Скорость: {skorost} км/ч\n"
+            f"Реакция: {reakciya} мс\n"
+            f"Стойкость: {stoikost} очк.\n"
+            f"Регенерация: {regen}%/пост\n"
+            f"Контроль маны: {kontrol}%\n"
             f"Мана/Энергия: {energiya}%"
         ),
         inline=False
@@ -228,8 +243,9 @@ async def list_slots(ctx, member: discord.Member = None):
     await ctx.send(embed=embed)
 
 # ============ РЕДАКТИРОВАНИЕ (только ГМ) ============
-@bot.command(name="добавить_стат")
-async def add_stat(ctx, member: discord.Member, slot: int, stat: str, value: int):
+@bot.command(name="стат")
+async def set_stat(ctx, member: discord.Member, slot: int, stat: str, *, value: str):
+    """Устанавливает точное значение стата напрямую (не прибавляет, а заменяет)"""
     if not is_gm(ctx):
         await ctx.send("⛔ У вас нет прав на это действие.")
         return
@@ -240,23 +256,9 @@ async def add_stat(ctx, member: discord.Member, slot: int, stat: str, value: int
     if stat not in STATS:
         await ctx.send(f"⚠️ Неизвестный стат. Доступные: {', '.join(STATS.keys())}")
         return
-    update_stat(member.id, slot, stat, value)
-    await ctx.send(f"✅ {STATS[stat]} у {member.display_name} (слот {slot}) увеличен на {value}")
-
-@bot.command(name="убрать_стат")
-async def remove_stat(ctx, member: discord.Member, slot: int, stat: str, value: int):
-    if not is_gm(ctx):
-        await ctx.send("⛔ У вас нет прав на это действие.")
-        return
-    if not valid_slot(slot):
-        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
-        return
-    stat = stat.lower()
-    if stat not in STATS:
-        await ctx.send(f"⚠️ Неизвестный стат. Доступные: {', '.join(STATS.keys())}")
-        return
-    update_stat(member.id, slot, stat, -value)
-    await ctx.send(f"✅ {STATS[stat]} у {member.display_name} (слот {slot}) уменьшен на {value}")
+    set_field(member.id, slot, stat, value)
+    unit = STAT_UNITS.get(stat, "")
+    await ctx.send(f"✅ {STATS[stat]} у {member.display_name} (слот {slot}) установлен(а) на: {value} {unit}")
 
 @bot.command(name="добавить_трейт")
 async def add_trait(ctx, member: discord.Member, slot: int, *, trait_name: str):
@@ -445,6 +447,28 @@ async def remove_organization(ctx, member: discord.Member, slot: int):
     set_field(member.id, slot, "organization", "Не указана")
     await ctx.send(f"✅ Организация персонажа (слот {slot}) сброшена")
 
+@bot.command(name="сборка")
+async def set_build(ctx, member: discord.Member, slot: int, *, value: str):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    set_field(member.id, slot, "builds", value)
+    await ctx.send(f"✅ Сборка персонажа (слот {slot}) обновлена")
+
+@bot.command(name="убрать_сборку")
+async def remove_build(ctx, member: discord.Member, slot: int):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    set_field(member.id, slot, "builds", "—")
+    await ctx.send(f"✅ Сборка персонажа (слот {slot}) сброшена")
+
 @bot.command(name="добавить_баланс")
 async def add_balance(ctx, member: discord.Member, slot: int, amount: int):
     if not is_gm(ctx):
@@ -504,6 +528,74 @@ async def set_photo(ctx, member: discord.Member, slot: int):
     image_url = ctx.message.attachments[0].url
     set_field(member.id, slot, "image_url", image_url)
     await ctx.send(f"✅ Фото для {member.display_name} (слот {slot}) обновлено")
+
+@bot.command(name="помощь")
+async def show_help(ctx):
+    embed = discord.Embed(
+        title="📖 Список команд",
+        color=discord.Color.dark_red()
+    )
+
+    embed.add_field(
+        name="👀 Просмотр (доступно всем)",
+        value=(
+            "`!информация` — твой слот 1\n"
+            "`!информация 3` — твой слот 3\n"
+            "`!информация 3 @игрок` — слот 3 другого игрока\n"
+            "`!слоты` — список всех 6 слотов (свои)\n"
+            "`!слоты @игрок` — слоты другого игрока\n"
+            "`!помощь` — это сообщение"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📊 Статы (только ГМ)",
+        value=(
+            "`!стат @игрок 1 [стат] [значение]` — установить точное значение\n"
+            f"Доступные статы: {', '.join(STATS.keys())}"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📋 Анкета персонажа (только ГМ)",
+        value=(
+            "`!имя @игрок 1 [имя]`\n"
+            "`!раса @игрок 1 [раса]`\n"
+            "`!стиль_боя @игрок 1 [стиль]` / `!убрать_стиль_боя @игрок 1`\n"
+            "`!уровень @игрок 1 [уровень]`\n"
+            "`!рост @игрок 1 [рост]`\n"
+            "`!вес @игрок 1 [вес]`\n"
+            "`!возраст @игрок 1 [возраст]`\n"
+            "`!описание @игрок 1 [текст]`\n"
+            "`!организация @игрок 1 [название]` / `!убрать_организацию @игрок 1`\n"
+            "`!сборка @игрок 1 [текст]` / `!убрать_сборку @игрок 1`\n"
+            "`!фото @игрок 1` (+ прикреплённое изображение)"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="✨ Трейты и артефакты (только ГМ)",
+        value=(
+            "`!добавить_трейт @игрок 1 [название]` / `!убрать_трейт @игрок 1 [название]`\n"
+            "`!добавить_артефакт @игрок 1 [название]` / `!убрать_артефакт @игрок 1 [название]`"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🏆 Достижения, баланс, зоны (только ГМ)",
+        value=(
+            "`!достижение @игрок 1 [название]` / `!убрать_достижение @игрок 1 [название]`\n"
+            "`!добавить_баланс @игрок 1 [сумма]` / `!убрать_баланс @игрок 1 [сумма]`\n"
+            "`!добавить_зоны @игрок 1 [кол-во]` / `!убрать_зоны @игрок 1 [кол-во]`"
+        ),
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
 
 # ============ ЗАПУСК ============
 @bot.event
