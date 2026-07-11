@@ -132,7 +132,7 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
     (_, _, name, race, fight_style, level, prochnost, sila, skorost, reakciya,
      stoikost, regen, kontrol, energiya, traits, artifacts, achievements, image_url) = row
 
-    embed = discord.Embed(title=f"📋 [Слот {slot}] {name}", color=discord.Color.blue())
+    embed = discord.Embed(title=f"📋 [Слот {slot}] {name}", color=discord.Color.red())
     embed.set_thumbnail(url=member.display_avatar.url)
     if image_url:
         embed.set_image(url=image_url)
