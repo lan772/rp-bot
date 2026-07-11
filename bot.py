@@ -45,6 +45,9 @@ def init_db():
             weight TEXT DEFAULT 'Не указан',
             age TEXT DEFAULT 'Не указан',
             info TEXT DEFAULT '—',
+            organization TEXT DEFAULT 'Не указана',
+            balance INTEGER DEFAULT 0,
+            cleared_zones INTEGER DEFAULT 0,
             прочность INTEGER DEFAULT 0,
             сила INTEGER DEFAULT 0,
             скорость INTEGER DEFAULT 0,
@@ -69,6 +72,7 @@ def init_db():
         ("weight", "'Не указан'"),
         ("age", "'Не указан'"),
         ("info", "'—'"),
+        ("organization", "'Не указана'"),
     ]
     for col, default in new_columns:
         try:
@@ -76,13 +80,20 @@ def init_db():
             conn.commit()
         except sqlite3.OperationalError:
             pass  # колонка уже существует
+    # Числовые колонки мигрируем отдельно (другой тип)
+    for col, default in [("balance", "0"), ("cleared_zones", "0")]:
+        try:
+            c.execute(f"ALTER TABLE characters ADD COLUMN {col} INTEGER DEFAULT {default}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
     conn.close()
 
 # Явный порядок колонок — не зависит от того, в каком физическом порядке
 # SQLite хранит их в таблице (важно из-за ALTER TABLE при миграциях)
 COLUMN_ORDER = [
     "user_id", "slot", "name", "race", "fight_style", "level",
-    "height", "weight", "age", "info",
+    "height", "weight", "age", "info", "organization", "balance", "cleared_zones",
     "прочность", "сила", "скорость", "реакция", "стойкость", "регенерация",
     "контроль_маны", "энергия", "traits", "artifacts", "achievements", "image_url"
 ]
@@ -152,6 +163,7 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
 
     row = get_char(member.id, slot)
     (_, _, name, race, fight_style, level, height, weight, age, info_text,
+     organization, balance, cleared_zones,
      prochnost, sila, skorost, reakciya,
      stoikost, regen, kontrol, energiya, traits, artifacts, achievements, image_url) = row
 
@@ -173,6 +185,9 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
         inline=False
     )
     embed.add_field(name="📖 Информация", value=info_text, inline=False)
+    embed.add_field(name="🏛 Организация", value=organization, inline=True)
+    embed.add_field(name="💰 Баланс", value=f"{balance} монет", inline=True)
+    embed.add_field(name="🗺 Зачищено Аномальных Зон", value=str(cleared_zones), inline=True)
     embed.add_field(
         name="📊 Статы",
         value=(
@@ -208,7 +223,7 @@ async def list_slots(ctx, member: discord.Member = None):
     embed = discord.Embed(
         title=f"📁 Слоты персонажей — {member.display_name}",
         description="\n".join(lines),
-        color=discord.Color.gold()
+        color=discord.Color.yellow()
     )
     await ctx.send(embed=embed)
 
@@ -407,6 +422,72 @@ async def set_info(ctx, member: discord.Member, slot: int, *, value: str):
         return
     set_field(member.id, slot, "info", value)
     await ctx.send(f"✅ Информация персонажа (слот {slot}) обновлена")
+
+@bot.command(name="организация")
+async def set_organization(ctx, member: discord.Member, slot: int, *, value: str):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    set_field(member.id, slot, "organization", value)
+    await ctx.send(f"✅ Организация персонажа (слот {slot}) установлена: {value}")
+
+@bot.command(name="убрать_организацию")
+async def remove_organization(ctx, member: discord.Member, slot: int):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    set_field(member.id, slot, "organization", "Не указана")
+    await ctx.send(f"✅ Организация персонажа (слот {slot}) сброшена")
+
+@bot.command(name="добавить_баланс")
+async def add_balance(ctx, member: discord.Member, slot: int, amount: int):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    update_stat(member.id, slot, "balance", amount)
+    await ctx.send(f"✅ Баланс {member.display_name} (слот {slot}) увеличен на {amount}")
+
+@bot.command(name="убрать_баланс")
+async def remove_balance(ctx, member: discord.Member, slot: int, amount: int):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    update_stat(member.id, slot, "balance", -amount)
+    await ctx.send(f"✅ Баланс {member.display_name} (слот {slot}) уменьшен на {amount}")
+
+@bot.command(name="добавить_зоны")
+async def add_cleared_zones(ctx, member: discord.Member, slot: int, amount: int):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    update_stat(member.id, slot, "cleared_zones", amount)
+    await ctx.send(f"✅ Зачищенные зоны {member.display_name} (слот {slot}) увеличены на {amount}")
+
+@bot.command(name="убрать_зоны")
+async def remove_cleared_zones(ctx, member: discord.Member, slot: int, amount: int):
+    if not is_gm(ctx):
+        await ctx.send("⛔ У вас нет прав на это действие.")
+        return
+    if not valid_slot(slot):
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        return
+    update_stat(member.id, slot, "cleared_zones", -amount)
+    await ctx.send(f"✅ Зачищенные зоны {member.display_name} (слот {slot}) уменьшены на {amount}")
 
 @bot.command(name="фото")
 async def set_photo(ctx, member: discord.Member, slot: int):
