@@ -66,15 +66,24 @@ def init_db():
             pass  # колонка уже существует
     conn.close()
 
+# Явный порядок колонок — не зависит от того, в каком физическом порядке
+# SQLite хранит их в таблице (важно из-за ALTER TABLE при миграциях)
+COLUMN_ORDER = [
+    "user_id", "slot", "name", "race", "fight_style", "level",
+    "прочность", "сила", "скорость", "реакция", "стойкость", "регенерация",
+    "контроль_маны", "энергия", "traits", "artifacts", "achievements", "image_url"
+]
+COLUMNS_SQL = ", ".join(COLUMN_ORDER)
+
 def get_char(user_id, slot):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT * FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
+    c.execute(f"SELECT {COLUMNS_SQL} FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
     row = c.fetchone()
     if row is None:
         c.execute("INSERT INTO characters (user_id, slot) VALUES (?, ?)", (user_id, slot))
         conn.commit()
-        c.execute("SELECT * FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
+        c.execute(f"SELECT {COLUMNS_SQL} FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
         row = c.fetchone()
     conn.close()
     return row
@@ -132,7 +141,7 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
     (_, _, name, race, fight_style, level, prochnost, sila, skorost, reakciya,
      stoikost, regen, kontrol, energiya, traits, artifacts, achievements, image_url) = row
 
-    embed = discord.Embed(title=f"📋 [Слот {slot}] {name}", color=discord.Color.red())
+    embed = discord.Embed(title=f"📋 [Слот {slot}] {name}", color=discord.Color.blue())
     embed.set_thumbnail(url=member.display_avatar.url)
     if image_url:
         embed.set_image(url=image_url)
