@@ -9,7 +9,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
 # PostgreSQL подключение (Railway предоставляет эти переменные)
-DATABASE_URL = os.getenv("DATABASE_URL")  # Например: postgresql://user:pass@host:port/db
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -120,7 +120,7 @@ async def get_char(user_id, slot):
                 "INSERT INTO characters (user_id, slot) VALUES ($1, $2)",
                 user_id, slot
             )
-# Получаем созданного
+            # Получаем созданного
             row = await conn.fetchrow(
                 "SELECT * FROM characters WHERE user_id=$1 AND slot=$2",
                 user_id, slot
@@ -232,8 +232,7 @@ async def info(ctx, slot: int = 1, member: discord.Member = None):
     )
     embed.add_field(
         name="🗡 Артефакты", 
-        value=row['artifacts'].
-replace(";", "\n") or "—", 
+        value=row['artifacts'].replace(";", "\n") or "—", 
         inline=False
     )
     embed.add_field(
@@ -336,9 +335,9 @@ async def add_achievement(ctx, member: discord.Member, slot: int, *, ach_name: s
     if not valid_slot(slot):
         await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
         return
-    await update_list_field(member.
-id, slot, "achievements", ach_name, add=True)
-    await ctx.send(f"🏆 Достижение «{ach_name}» добавлено для {member.display_name} (слот {slot})")
+    await update_list_field(member.id, slot, "achievements", ach_name, add=True)
+    await ctx.
+    send(f"🏆 Достижение «{ach_name}» добавлено для {member.display_name} (слот {slot})")
 
 @bot.command(name="убрать_достижение")
 async def remove_achievement(ctx, member: discord.Member, slot: int, *, ach_name: str):
@@ -434,8 +433,7 @@ async def set_age(ctx, member: discord.Member, slot: int, *, value: str):
         await ctx.send("⛔️ У вас нет прав на это действие.")
         return
     if not valid_slot(slot):
-        await ctx.
-send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
         return
     await set_field(member.id, slot, "age", value)
     await ctx.send(f"✅ Возраст персонажа (слот {slot}) установлен: {value}")
@@ -533,8 +531,9 @@ async def remove_cleared_zones(ctx, member: discord.Member, slot: int, amount: i
     if not is_gm(ctx):
         await ctx.send("⛔️ У вас нет прав на это действие.")
         return
-if not valid_slot(slot):
-        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+    if not valid_slot(slot):
+        await ctx.
+        send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
         return
     await update_stat(member.id, slot, "cleared_zones", -amount)
     await ctx.send(f"✅ Зачищенные зоны {member.display_name} (слот {slot}) уменьшены на {amount}")
@@ -633,7 +632,7 @@ async def on_ready():
         print("⚠️ Внимание! База данных не инициализирована. Бот продолжит работу, но функции БД недоступны.")
 
 # Запуск бота
-if __name__ == "__main__":
+if name == "__main__":
     # Создаем event loop и запускаем бота
     loop = asyncio.get_event_loop()
     try:
