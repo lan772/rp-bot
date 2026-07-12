@@ -336,8 +336,7 @@ async def add_achievement(ctx, member: discord.Member, slot: int, *, ach_name: s
         await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
         return
     await update_list_field(member.id, slot, "achievements", ach_name, add=True)
-    await ctx.
-    send(f"🏆 Достижение «{ach_name}» добавлено для {member.display_name} (слот {slot})")
+    await ctx.send(f"🏆 Достижение «{ach_name}» добавлено для {member.display_name} (слот {slot})")
 
 @bot.command(name="убрать_достижение")
 async def remove_achievement(ctx, member: discord.Member, slot: int, *, ach_name: str):
