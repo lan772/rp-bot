@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-import psycopg2
+import psycopg
 import os
 
 # ============ НАСТРОЙКА ============
@@ -43,7 +43,7 @@ STAT_UNITS = {
 
 # ============ БАЗА ДАННЫХ ============
 def get_db():
-    return psycopg2.connect(DB_URL)
+    return psycopg.connect(DB_URL)
 
 def init_db():
     conn = get_db()
