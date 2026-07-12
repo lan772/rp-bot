@@ -630,7 +630,7 @@ async def on_ready():
         print("⚠️ Внимание! База данных не инициализирована. Бот продолжит работу, но функции БД недоступны.")
 
 # Запуск бота
-if name == "__main__":
+if "__name__" == "__main__":
     # Создаем event loop и запускаем бота
     loop = asyncio.get_event_loop()
     try:
