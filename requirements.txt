@@ -1,5 +1,4 @@
 discord.py==2.4.0
-asyncpg>=0.28.0
-audioop-lts; python_version >= "3.13"
-python-dotenv>=1.0.0
+asyncpg>=0.29.0
+
 
