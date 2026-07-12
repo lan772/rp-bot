@@ -628,7 +628,7 @@ async def on_ready():
     if not success:
         print("⚠️ Внимание! База данных не инициализирована. Бот продолжит работу, но функции БД недоступны.")
 
-if name == "__main__":
+if "__name__" == "__main__":
     try:
         asyncio.run(bot.start(TOKEN))
     except KeyboardInterrupt:
