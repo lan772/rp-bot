@@ -531,8 +531,7 @@ async def remove_cleared_zones(ctx, member: discord.Member, slot: int, amount: i
         await ctx.send("⛔️ У вас нет прав на это действие.")
         return
     if not valid_slot(slot):
-        await ctx.
-        send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
+        await ctx.send(f"⚠️ Слот должен быть от 1 до {SLOT_COUNT}")
         return
     await update_stat(member.id, slot, "cleared_zones", -amount)
     await ctx.send(f"✅ Зачищенные зоны {member.display_name} (слот {slot}) уменьшены на {amount}")
