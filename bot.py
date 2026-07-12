@@ -623,21 +623,13 @@ async def show_help(ctx):
 # ============ ЗАПУСК ============
 @bot.event
 async def on_ready():
-    print(f"Бот запущен как {bot.user}")
-    # Инициализируем базу данных
+    print(f"✅ Бот запущен как {bot.user}")
     success = await init_db()
     if not success:
         print("⚠️ Внимание! База данных не инициализирована. Бот продолжит работу, но функции БД недоступны.")
 
-# Запуск бота
-if "__name__" == "__main__":
-    # Создаем event loop и запускаем бота
-    loop = asyncio.get_event_loop()
+if name == "__main__":
     try:
-        loop.run_until_complete(bot.start(TOKEN))
+        asyncio.run(bot.start(TOKEN))
     except KeyboardInterrupt:
-        loop.run_until_complete(bot.close())
-    finally:
-        if db_pool:
-            loop.run_until_complete(db_pool.close())
-        loop.close()
+        print("🛑 Бот остановлен пользователем")
