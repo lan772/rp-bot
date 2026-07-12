@@ -80,10 +80,10 @@ def init_db():
         )
     """)
     conn.commit()
+    c.close()
     conn.close()
 
-# Явный порядок колонок — не зависит от того, в каком физическом порядке
-# SQLite хранит их в таблице (важно из-за ALTER TABLE при миграциях)
+# Явный порядок колонок — не зависит от физического порядка в таблице
 COLUMN_ORDER = [
     "user_id", "slot", "name", "race", "fight_style", "level",
     "height", "weight", "age", "info", "organization", "builds", "balance", "cleared_zones",
@@ -95,13 +95,14 @@ COLUMNS_SQL = ", ".join(COLUMN_ORDER)
 def get_char(user_id, slot):
     conn = get_db()
     c = conn.cursor()
-    c.execute(f"SELECT {COLUMNS_SQL} FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
+    c.execute(f"SELECT {COLUMNS_SQL} FROM characters WHERE user_id=%s AND slot=%s", (user_id, slot))
     row = c.fetchone()
     if row is None:
-        c.execute("INSERT INTO characters (user_id, slot) VALUES (?, ?)", (user_id, slot))
+        c.execute("INSERT INTO characters (user_id, slot) VALUES (%s, %s)", (user_id, slot))
         conn.commit()
-        c.execute(f"SELECT {COLUMNS_SQL} FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
+        c.execute(f"SELECT {COLUMNS_SQL} FROM characters WHERE user_id=%s AND slot=%s", (user_id, slot))
         row = c.fetchone()
+    c.close()
     conn.close()
     return row
 
@@ -109,15 +110,16 @@ def update_stat(user_id, slot, stat, delta):
     get_char(user_id, slot)
     conn = get_db()
     c = conn.cursor()
-    c.execute(f"UPDATE characters SET {stat} = {stat} + ? WHERE user_id=? AND slot=?", (delta, user_id, slot))
+    c.execute(f"UPDATE characters SET {stat} = {stat} + %s WHERE user_id=%s AND slot=%s", (delta, user_id, slot))
     conn.commit()
+    c.close()
     conn.close()
 
 def update_list_field(user_id, slot, field, value, add=True):
     get_char(user_id, slot)
     conn = get_db()
     c = conn.cursor()
-    c.execute(f"SELECT {field} FROM characters WHERE user_id=? AND slot=?", (user_id, slot))
+    c.execute(f"SELECT {field} FROM characters WHERE user_id=%s AND slot=%s", (user_id, slot))
     current = c.fetchone()[0]
     items = [i for i in current.split(";") if i] if current else []
     if add:
@@ -125,16 +127,18 @@ def update_list_field(user_id, slot, field, value, add=True):
     else:
         items = [i for i in items if i.lower() != value.lower()]
     new_value = ";".join(items)
-    c.execute(f"UPDATE characters SET {field}=? WHERE user_id=? AND slot=?", (new_value, user_id, slot))
+    c.execute(f"UPDATE characters SET {field}=%s WHERE user_id=%s AND slot=%s", (new_value, user_id, slot))
     conn.commit()
+    c.close()
     conn.close()
 
 def set_field(user_id, slot, field, value):
     get_char(user_id, slot)
     conn = get_db()
     c = conn.cursor()
-    c.execute(f"UPDATE characters SET {field}=? WHERE user_id=? AND slot=?", (value, user_id, slot))
+    c.execute(f"UPDATE characters SET {field}=%s WHERE user_id=%s AND slot=%s", (value, user_id, slot))
     conn.commit()
+    c.close()
     conn.close()
 
 def valid_slot(slot):
@@ -209,10 +213,11 @@ async def list_slots(ctx, member: discord.Member = None):
     c = conn.cursor()
     lines = []
     for slot in range(1, SLOT_COUNT + 1):
-        c.execute("SELECT name FROM characters WHERE user_id=? AND slot=?", (member.id, slot))
+        c.execute("SELECT name FROM characters WHERE user_id=%s AND slot=%s", (member.id, slot))
         row = c.fetchone()
         name = row[0] if row else "Пустой слот"
         lines.append(f"**Слот {slot}:** {name}")
+    c.close()
     conn.close()
     embed = discord.Embed(
         title=f"📁 Слоты персонажей — {member.display_name}",
